@@ -44,9 +44,7 @@
 #include <tf2/convert.h>
 
 // C++
-#include <chrono>
 #include <cmath>  // for random poses
-#include <random>
 #include <set>
 #include <string>
 #include <utility>
@@ -62,8 +60,6 @@ const std::string RvizVisualTools::NAME = "visual_tools";
 const std::array<colors, 14> RvizVisualTools::ALL_RAND_COLORS = { RED,        GREEN,  BLUE,   GREY,   DARK_GREY,
                                                                   WHITE,      ORANGE, YELLOW, BROWN,  PINK,
                                                                   LIME_GREEN, PURPLE, CYAN,   MAGENTA };
-
-std::mt19937 RvizVisualTools::mt_random_engine_(std::chrono::system_clock::now().time_since_epoch().count());
 
 RvizVisualTools::RvizVisualTools(std::string base_frame, std::string marker_topic, ros::NodeHandle nh)
   : nh_(nh), marker_topic_(std::move(marker_topic)), base_frame_(std::move(base_frame))
@@ -284,9 +280,7 @@ void RvizVisualTools::loadMarkerPub(bool wait_for_subscriber, bool latched)
   }
 
   // Rviz marker publisher
-  ros::NodeHandle nh(nh_.getNamespace());
-  nh.setCallbackQueue(&vis_marker_queue_);
-  pub_rviz_markers_ = nh.advertise<visualization_msgs::MarkerArray>(marker_topic_, 10, latched);
+  pub_rviz_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(marker_topic_, 10, latched);
   ROS_DEBUG_STREAM_NAMED(LOGNAME, "Publishing Rviz markers on topic " << pub_rviz_markers_.getTopic());
 
   if (wait_for_subscriber)
@@ -340,7 +334,7 @@ bool RvizVisualTools::waitForSubscriber(const ros::Publisher& pub, double wait_t
                                                   "will be lost.");
       return false;
     }
-    vis_marker_queue_.callAvailable(ros::WallDuration());
+    ros::spinOnce();
 
     // Sleep
     poll_rate.sleep();
@@ -2807,22 +2801,26 @@ bool RvizVisualTools::posesEqual(const Eigen::Isometry3d& pose1, const Eigen::Is
 
 double RvizVisualTools::dRand(double min, double max)
 {
-  return std::uniform_real_distribution<double>(min, max)(mt_random_engine_);
+  double d = static_cast<double>(rand()) / RAND_MAX;
+  return min + d * (max - min);
 }
 
 float RvizVisualTools::fRand(float min, float max)
 {
-  return std::uniform_real_distribution<float>(min, max)(mt_random_engine_);
+  float d = static_cast<float>(rand()) / RAND_MAX;
+  return min + d * (max - min);
 }
 
 int RvizVisualTools::iRand(int min, int max)
 {
-  return std::uniform_int_distribution<int>(min, max)(mt_random_engine_);
-}
-
-void RvizVisualTools::setRandomSeed(unsigned int seed)
-{
-  mt_random_engine_.seed(seed);
+  int n = max - min + 1;
+  int remainder = RAND_MAX % n;
+  int x;
+  do
+  {
+    x = rand();
+  } while (x >= RAND_MAX - remainder);
+  return min + x % n;
 }
 
 void RvizVisualTools::printTranslation(const Eigen::Vector3d& translation)
